@@ -227,6 +227,7 @@ fi
 * Thu Oct 27 2022 Björn Bidar <bjorn.bidar@thaodan.de>
 - Add systemd unit for systemd --user instance
 - Create initial log file with systemd-tmpfiles
+- Harden systemd service
 
 * Wed Jul 07 2021 Michal Suchanek <msuchanek@suse.com>
 - Tumbleweed no longer supports init.d services and fails build when installed
