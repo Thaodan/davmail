@@ -106,6 +106,7 @@ desktop-file-install --dir $RPM_BUILD_ROOT%{_datadir}/applications/ src/desktop/
 install -m 0775 src/init/davmail-wrapper $RPM_BUILD_ROOT%{_localstatedir}/lib/davmail/davmail
 %if %systemd_support
 install -D -m 644 src/init/davmail.service %{buildroot}%{_unitdir}/davmail.service
+install -D -m 644 src/init/davmail@.service %{buildroot}%{_unitdir}/davmail@.service
 install -D -m 644 src/init/davmail-user.service %{buildroot}%{_userunitdir}/davmail.service
 install -D -m 644 src/init/daivmail.conf %{buildroot}%{_tmpfilesdir}/davmail.conf
 %else
@@ -228,6 +229,7 @@ fi
 - Add systemd unit for systemd --user instance
 - Create initial log file with systemd-tmpfiles
 - Harden systemd service
+- Add systemd template unit
 
 * Wed Jul 07 2021 Michal Suchanek <msuchanek@suse.com>
 - Tumbleweed no longer supports init.d services and fails build when installed
