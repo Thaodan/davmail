@@ -89,6 +89,7 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT%{_sbindir}
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
+# Should this be created if systemd support is on?
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/init.d
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/applications
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/pixmaps
@@ -106,6 +107,7 @@ install -m 0775 src/init/davmail-wrapper $RPM_BUILD_ROOT%{_localstatedir}/lib/da
 %if %systemd_support
 install -D -m 644 src/init/davmail.service %{buildroot}%{_unitdir}/davmail.service
 install -D -m 644 src/init/davmail-user.service %{buildroot}%{_userunitdir}/davmail.service
+install -D -m 644 src/init/daivmail.conf %{buildroot}%{_tmpfilesdir}/davmail.conf
 %else
 install -m 0775 src/init/davmail-init $RPM_BUILD_ROOT%{_sysconfdir}/init.d/davmail
 ln -sf %{_sysconfdir}/init.d/davmail $RPM_BUILD_ROOT%{_sbindir}/rcdavmail
@@ -137,6 +139,7 @@ rm -rf $RPM_BUILD_ROOT
 %endif
 
 %post
+%if 0%{!?systemd_macros:1}
 file=/var/log/davmail.log
 if [ ! -f ${file} ]
     then
@@ -144,6 +147,7 @@ if [ ! -f ${file} ]
 fi
 /bin/chown davmail:davmail ${file}
 /bin/chmod 0640 ${file}
+%endif
 
 %if %systemd_macros
 %service_add_post davmail.service
