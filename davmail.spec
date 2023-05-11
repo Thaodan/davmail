@@ -35,10 +35,14 @@ BuildRequires: javafx
 %endif
 Requires: coreutils
 Requires: filesystem
+%if %systemd_support
+%systemd_requires
+%else
 Requires(pre): /usr/sbin/useradd, /usr/sbin/groupadd
 Requires(post): coreutils, filesystem, /sbin/chkconfig
 Requires(preun): /sbin/service, coreutils, /sbin/chkconfig, /usr/sbin/userdel, /usr/sbin/groupdel
 Requires(postun): /sbin/service
+%endif
 
 %if 0%{?el7} || 0%{?el8} || 0%{?fedora}
 Requires: /etc/init.d, logrotate, java-1.8.0-openjdk
@@ -81,16 +85,24 @@ rm lib/swt*
 ant -Dant.java.version=1.8 prepare-dist
 
 %install
-rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_bindir}
 mkdir -p $RPM_BUILD_ROOT%{_sbindir}
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/logrotate.d
+%if 0%{?!systemd_support:1}
 mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/init.d
+%endif
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/applications
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/pixmaps
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/davmail/lib
+%if 0%{?!systemd_support:1}
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/lib/davmail
+%endif
 mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log
+
+%if %systemd_support
+# Add the file here so rpm can keep track of it even if systemd creates it later
+touch %{buildroot}%{_var}/log/davmail.log
+%endif
 
 # Init scripts, icons, configurations
 install -m 0775 src/bin/davmail $RPM_BUILD_ROOT%{_bindir}/davmail
@@ -98,9 +110,12 @@ install -m 0644 src/init/davmail-logrotate $RPM_BUILD_ROOT%{_sysconfdir}/logrota
 install -m 0644 src/etc/davmail.properties $RPM_BUILD_ROOT%{_sysconfdir}
 # https://fedoraproject.org/wiki/TomCallaway/DesktopFileVendor
 desktop-file-install --dir $RPM_BUILD_ROOT%{_datadir}/applications/ src/desktop/davmail.desktop --vendor=""
-install -m 0775 src/init/davmail-wrapper $RPM_BUILD_ROOT%{_localstatedir}/lib/davmail/davmail
 %if %systemd_support
 install -D -m 644 src/init/davmail.service %{buildroot}%{_unitdir}/davmail.service
+install -D -m 644 src/init/davmail@.service %{buildroot}%{_unitdir}/davmail@.service
+install -D -m 644 src/init/davmail-user@.service %{buildroot}%{_userunitdir}/davmail@.service
+install -D -m 644 src/init/davmail.conf %{buildroot}%{_tmpfilesdir}/davmail.conf
+install -D -m 644 src/init/davmail_sysusers.conf %{buildroot}%{_sysusersdir}/davmail.conf
 %else
 install -m 0775 src/init/davmail-init $RPM_BUILD_ROOT%{_sysconfdir}/init.d/davmail
 ln -sf %{_sysconfdir}/init.d/davmail $RPM_BUILD_ROOT%{_sbindir}/rcdavmail
@@ -121,14 +136,16 @@ install -m 0644 src/appstream/org.davmail.DavMail.appdata.xml $RPM_BUILD_ROOT%{_
 %endif
 
 %pre
+%if 0%{!?systemd_macros:1}
 /usr/sbin/groupadd -f -r davmail > /dev/null 2>&1 || :
 /usr/sbin/useradd -r -s /sbin/nologin -d /var/lib/davmail -M \
                   -g davmail davmail > /dev/null 2>&1 || :
-%if %systemd_macros
+%else
 %service_add_pre davmail.service
 %endif
 
 %post
+%if 0%{!?systemd_macros:1}
 file=/var/log/davmail.log
 if [ ! -f ${file} ]
     then
@@ -136,9 +153,12 @@ if [ ! -f ${file} ]
 fi
 /bin/chown davmail:davmail ${file}
 /bin/chmod 0640 ${file}
+%endif
 
 %if %systemd_macros
 %service_add_post davmail.service
+# Ensure that tmpfiles are created after the package is installed or updated
+%tmpfiles_create_package %{_tmpfilesdir}/davmail.conf
 %else
 # proper service handling http://en.opensuse.org/openSUSE:Cron_rename
 %{?fillup_and_insserv:
@@ -196,6 +216,10 @@ fi
 
 %if %systemd_support
 %{_unitdir}/davmail.service
+%{_unitdir}/davmail@.service
+%{_userunitdir}/davmail@.service
+%{_tmpfilesdir}/davmail.conf
+%{_sysusersdir}/davmail.conf
 %else
 %{_sysconfdir}/init.d/davmail
 %{_sbindir}/rcdavmail
@@ -203,12 +227,19 @@ fi
 
 %config(noreplace) %{_sysconfdir}/logrotate.d/davmail
 %config(noreplace) %{_sysconfdir}/davmail.properties
+# As sugggested by rpmlint:
+# tmpfile-not-in-filelist
+# declare ownership of the log file but prevent
+# it from being erased by rpm -e
+%ghost %attr (640,davmail,davmail)  %{_var}/log/davmail.log
 %{_datadir}/applications/*
 %{_datadir}/pixmaps/*
 %{_datadir}/davmail/
 %if 0%{?sle_version} != 120300 && 0%{?suse_version} != 1310 && 0%{?suse_version} != 1320
 %{_datadir}/metainfo/org.davmail.DavMail.appdata.xml
 %endif
+%if 0%{?!systemd_support:1}
 %attr(0775,davmail,davmail) %{_localstatedir}/lib/davmail
+%endif
 
 %changelog
